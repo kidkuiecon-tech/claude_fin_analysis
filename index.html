@@ -940,7 +940,11 @@ async function runAnalysis() {
     showOutput(full, false, false);
 
   } catch (err) {
-    showOutput(`Error: ${err.message}\n\nIf this says "Failed to fetch", try opening the file via a local server or GitHub Pages instead of double-clicking the file directly.`, false, false);
+    let msg = `Error: ${err.message}`;
+    if (err.message.includes("fetch")) {
+      msg += "\n\nThis usually means one of:\n- The api/analyze.js file is missing from your GitHub repo\n- The ANTHROPIC_API_KEY environment variable is not set in Vercel\n- Vercel has not redeployed after you added the API key\n\nFix: Go to Vercel → Settings → Environment Variables → add ANTHROPIC_API_KEY → Redeploy";
+    }
+    showOutput(msg, false, false);
   } finally {
     isLoading = false;
     document.getElementById("run-btn").disabled = false;
