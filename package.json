@@ -1,0 +1,7 @@
+{
+  "name": "financial-analyst-ai",
+  "version": "1.0.0",
+  "engines": {
+    "node": "24.x"
+  }
+}
