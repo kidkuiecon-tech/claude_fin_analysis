@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FinancialAnalystAI — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #08090d;
+      --surface: #0f1117;
+      --surface2: #161a22;
+      --border: #1e2330;
+      --border2: #252d3d;
+      --accent: #00e5a0;
+      --accent2: #0096ff;
+      --accent3: #ff6b35;
+      --warn: #ffcc00;
+      --sell: #ff4466;
+      --buy: #00e5a0;
+      --hold: #ffcc00;
+      --text: #e8ecf4;
+      --text2: #8892a4;
+      --text3: #4a5568;
+    }
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+    @keyframes ticker    { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    @keyframes spin      { to   { transform: rotate(360deg); } }
+    @keyframes pulse     { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+    @keyframes fadeIn    { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+    @keyframes glowPulse { 0%,100% { box-shadow:0 0 10px rgba(0,229,160,.1); } 50% { box-shadow:0 0 24px rgba(0,229,160,.3); } }
+
+    /* ── Layout ── */
+    #app   { display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+    #header { display:flex; align-items:center; justify-content:space-between; padding:14px 24px; background:var(--surface); border-bottom:1px solid var(--border); flex-shrink:0; }
+    #tape-wrap { height:28px; background:var(--surface); border-bottom:1px solid var(--border); overflow:hidden; display:flex; align-items:center; flex-shrink:0; }
+    #tape { display:flex; gap:40px; white-space:nowrap; animation:ticker 30s linear infinite; font-family:'DM Mono',monospace; font-size:11px; }
+    #body  { display:flex; flex:1; overflow:hidden; }
+
+    /* ── Sidebar ── */
+    #sidebar { width:220px; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow-y:auto; flex-shrink:0; padding:16px 0; }
+    .sidebar-label { padding:0 16px 10px; font-family:'DM Mono',monospace; font-size:10px; color:var(--text3); letter-spacing:1px; }
+    .mode-btn { display:flex; align-items:center; gap:10px; padding:10px 16px; border:none; background:transparent; cursor:pointer; border-left:2px solid transparent; text-align:left; width:100%; transition:all .15s; }
+    .mode-btn:hover { background:rgba(255,255,255,.03); }
+    .mode-btn.active { background:rgba(0,229,160,.08); border-left-color:var(--accent); }
+    .mode-btn .icon { font-size:16px; color:var(--text3); }
+    .mode-btn.active .icon { color:var(--accent); }
+    .mode-btn .label { font-size:13px; font-weight:500; color:var(--text2); }
+    .mode-btn.active .label { color:var(--text); }
+    .mode-btn .sub { font-family:'DM Mono',monospace; font-size:10px; color:var(--text3); }
+    .history-item { display:flex; align-items:center; gap:8px; padding:8px 16px; border:none; background:transparent; cursor:pointer; width:100%; text-align:left; }
+    .history-item:hover { background:rgba(255,255,255,.02); }
+    .history-item .hticker { font-family:'DM Mono',monospace; font-size:11px; color:var(--text2); }
+    .history-item .htime  { font-family:'DM Mono',monospace; font-size:10px; color:var(--text3); }
+
+    /* ── Main ── */
+    #main { flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:14px; }
+
+    /* ── Cards ── */
+    .card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:16px 20px; }
+
+    /* ── Mode header ── */
+    #mode-header { display:flex; align-items:center; gap:16px; }
+    #mode-icon { width:44px; height:44px; background:var(--surface2); border:1px solid var(--border2); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; }
+    #mode-title { font-family:'Syne',sans-serif; font-weight:700; font-size:18px; }
+    #mode-desc  { font-size:13px; color:var(--text2); margin-top:2px; }
+
+    /* ── Input area ── */
+    .focus-pills { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+    .focus-pill  { padding:5px 12px; border-radius:20px; border:1px solid var(--border); background:var(--surface2); color:var(--text2); font-size:12px; cursor:pointer; transition:all .15s; font-family:'DM Sans',sans-serif; }
+    .focus-pill.active, .focus-pill:hover { border-color:var(--accent); background:rgba(0,229,160,.1); color:var(--accent); }
+    .input-row { display:flex; gap:10px; }
+    #ticker-input { flex:1; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:11px 16px; color:var(--text); font-family:'DM Mono',monospace; font-size:13px; transition:all .2s; }
+    #ticker-input:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 2px rgba(0,229,160,.1); }
+    #run-btn { padding:11px 24px; background:var(--accent); border:none; border-radius:8px; cursor:pointer; color:#08090d; font-family:'Syne',sans-serif; font-weight:700; font-size:13px; display:flex; align-items:center; gap:8px; transition:all .2s; white-space:nowrap; box-shadow:0 0 20px rgba(0,229,160,.15); }
+    #run-btn:disabled { background:var(--border); color:var(--text3); cursor:not-allowed; box-shadow:none; }
+    .quick-pills { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; align-items:center; }
+    .quick-label { font-family:'DM Mono',monospace; font-size:11px; color:var(--text3); }
+    .quick-pill  { padding:3px 10px; background:var(--surface2); border:1px solid var(--border); border-radius:4px; color:var(--text2); font-size:11px; font-family:'DM Mono',monospace; cursor:pointer; transition:all .15s; }
+    .quick-pill:hover { border-color:var(--accent); color:var(--accent); }
+
+    /* ── Output ── */
+    #output-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+    #output-status { font-family:'DM Mono',monospace; font-size:11px; color:var(--text3); display:flex; align-items:center; gap:10px; }
+    #example-badge { padding:2px 8px; background:rgba(0,150,255,.1); border:1px solid rgba(0,150,255,.3); border-radius:4px; font-family:'DM Mono',monospace; font-size:10px; color:var(--accent2); }
+    #copy-btn { padding:4px 12px; background:var(--surface2); border:1px solid var(--border); border-radius:4px; color:var(--text2); font-size:11px; font-family:'DM Mono',monospace; cursor:pointer; }
+    #copy-btn:hover { border-color:var(--accent); color:var(--accent); }
+    #output-box { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:20px; min-height:200px; max-height:500px; overflow-y:auto; line-height:1.8; white-space:pre-wrap; }
+    .stream-cursor::after { content:'▋'; animation:pulse .8s infinite; color:var(--accent); }
+    #spinner { width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; display:inline-block; }
+
+    /* ── Report formatting ── */
+    .r-h2  { font-family:'Syne',sans-serif; font-size:15px; font-weight:700; color:var(--accent); margin-top:18px; margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:5px; }
+    .r-h3  { font-family:'Syne',sans-serif; font-size:13px; font-weight:600; color:var(--accent2); margin-top:12px; margin-bottom:3px; }
+    .r-li  { padding-left:14px; color:var(--text2); font-size:13px; margin-bottom:2px; }
+    .r-li::before { content:'› '; color:var(--accent3); }
+    .r-buy  { color:var(--buy); font-family:'DM Mono',monospace; font-size:13px; }
+    .r-sell { color:var(--sell); font-family:'DM Mono',monospace; font-size:13px; }
+    .r-hold { color:var(--hold); font-family:'DM Mono',monospace; font-size:13px; }
+    .r-tbl  { font-family:'DM Mono',monospace; font-size:12px; color:var(--text2); padding:2px 0; border-bottom:1px solid var(--border); display:block; }
+    .r-blank { height:6px; display:block; }
+    .r-text { color:var(--text); font-size:14px; margin-bottom:2px; }
+
+    /* ── Empty state ── */
+    #empty { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; text-align:center; gap:14px; }
+    #empty-icon { width:60px; height:60px; border:1px solid var(--border); border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:28px; color:var(--text3); margin:0 auto; }
+    #empty-title { font-family:'Syne',sans-serif; font-weight:600; font-size:16px; color:var(--text2); }
+    #empty-desc  { font-size:13px; color:var(--text3); max-width:340px; }
+    .feature-pills { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+    .feature-pill  { padding:4px 12px; background:var(--surface); border:1px solid var(--border); border-radius:20px; font-family:'DM Mono',monospace; font-size:11px; color:var(--text3); }
+
+    /* ── Right panel ── */
+    #right { width:210px; background:var(--surface); border-left:1px solid var(--border); padding:16px; display:flex; flex-direction:column; gap:14px; overflow-y:auto; flex-shrink:0; }
+    .panel-card { border:1px solid var(--border); border-radius:8px; padding:12px; }
+    .panel-label { font-family:'DM Mono',monospace; font-size:10px; color:var(--text3); letter-spacing:1px; margin-bottom:10px; }
+    .score-row { display:flex; justify-content:space-between; margin-bottom:4px; }
+    .score-row span { font-family:'DM Mono',monospace; font-size:11px; }
+    .score-track { height:4px; background:var(--border); border-radius:2px; margin-bottom:8px; }
+    .score-fill  { height:100%; border-radius:2px; transition:width 1s ease; }
+    .stat-row { display:flex; justify-content:space-between; margin-bottom:6px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+    .stat-row span { font-family:'DM Mono',monospace; }
+    .stat-label { font-size:10px; color:var(--text3); }
+    .stat-val   { font-size:11px; color:var(--text); }
+    .score-ring { width:64px; height:64px; border-radius:50%; border:3px solid var(--accent); display:flex; align-items:center; justify-content:center; background:rgba(0,229,160,.06); box-shadow:0 0 16px rgba(0,229,160,.2); margin:0 auto 10px; animation:glowPulse 3s ease infinite; }
+    .score-ring span { font-family:'Syne',sans-serif; font-weight:800; font-size:22px; color:var(--accent); }
+    .badge { padding:3px 10px; border-radius:4px; font-family:'DM Mono',monospace; font-size:11px; font-weight:500; letter-spacing:1px; text-transform:uppercase; }
+    .badge-buy  { background:rgba(0,229,160,.12); color:var(--buy); border:1px solid rgba(0,229,160,.3); }
+    .badge-hold { background:rgba(255,204,0,.12); color:var(--hold); border:1px solid rgba(255,204,0,.3); }
+    .badge-sell { background:rgba(255,68,102,.12); color:var(--sell); border:1px solid rgba(255,68,102,.3); }
+    .nvda-card  { border:1px solid rgba(0,229,160,.25); border-radius:8px; padding:12px; background:rgba(0,229,160,.04); animation:glowPulse 3s ease infinite; }
+    .nvda-top   { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+    .nvda-ticker { font-family:'Syne',sans-serif; font-weight:700; font-size:15px; }
+    .nvda-price  { font-family:'DM Mono',monospace; font-size:18px; font-weight:500; margin-bottom:2px; }
+    .nvda-chg    { font-family:'DM Mono',monospace; font-size:10px; color:var(--accent); margin-bottom:10px; }
+    .disclaimer  { padding:10px; background:rgba(255,204,0,.05); border:1px solid rgba(255,204,0,.15); border-radius:8px; font-size:10px; color:var(--text3); line-height:1.6; }
+    .powered-by  { font-family:'DM Mono',monospace; font-size:10px; color:var(--text3); line-height:1.6; }
+
+    /* ── Logo ── */
+    #logo-box { width:32px; height:32px; background:var(--accent); border-radius:6px; display:flex; align-items:center; justify-content:center; animation:glowPulse 3s ease infinite; flex-shrink:0; }
+    #logo-box span { font-family:'Syne',sans-serif; font-weight:800; font-size:13px; color:#08090d; }
+    #logo-name { font-family:'Syne',sans-serif; font-weight:800; font-size:16px; letter-spacing:-.5px; }
+    #logo-sub  { font-family:'DM Mono',monospace; font-size:9px; color:var(--text3); margin-top:-2px; }
+    #header-right { display:flex; align-items:center; gap:16px; }
+    #header-date { font-family:'DM Mono',monospace; font-size:11px; color:var(--text3); }
+    #live-badge  { padding:4px 10px; background:rgba(0,229,160,.08); border:1px solid rgba(0,229,160,.2); border-radius:20px; font-family:'DM Mono',monospace; font-size:10px; color:var(--accent); }
+    .fade-in { animation:fadeIn .4s ease forwards; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HEADER -->
+  <div id="header">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div id="logo-box"><span>FA</span></div>
+      <div>
+        <div id="logo-name">FinancialAnalyst<span style="color:var(--accent)">AI</span></div>
+        <div id="logo-sub">INSTITUTIONAL-GRADE ANALYSIS ENGINE</div>
+      </div>
+    </div>
+    <div id="header-right">
+      <div id="header-date"></div>
+      <div id="key-status-pill" style="padding:4px 12px;background:rgba(255,68,102,0.1);border:1px solid rgba(255,68,102,0.3);border-radius:20px;font-family:'DM Mono',monospace;font-size:10px;color:var(--sell);cursor:pointer;" onclick="openKeyModal()">⚠ API Keys Not Set</div>
+      <button onclick="openKeyModal()" style="padding:6px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text2);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:6px;">⚙ API Keys</button>
+      <div id="live-badge">● LIVE</div>
+    </div>
+  </div>
+
+  <!-- API KEY MODAL -->
+  <div id="key-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.75);align-items:center;justify-content:center;">
+    <div style="background:var(--surface);border:1px solid var(--border2);border-radius:14px;width:580px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,0.5);">
+
+      <!-- Modal header -->
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:20px 24px;border-bottom:1px solid var(--border);">
+        <div>
+          <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:17px;">API Key Setup</div>
+          <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);margin-top:2px;">Based on Financial Analysis Skill — all keys stored locally in your browser</div>
+        </div>
+        <button onclick="closeKeyModal()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:20px;line-height:1;">✕</button>
+      </div>
+
+      <div style="padding:20px 24px;display:flex;flex-direction:column;gap:20px;">
+
+        <!-- Section: Required -->
+        <div>
+          <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:1px;margin-bottom:12px;">● REQUIRED — Core AI Engine</div>
+
+          <!-- Anthropic -->
+          <div style="margin-bottom:14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <div>
+                <span style="font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:var(--text)">Anthropic (Claude AI)</span>
+                <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);margin-left:8px;">Powers the analysis engine</span>
+              </div>
+              <a href="https://console.anthropic.com" target="_blank" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--accent2);text-decoration:none;">Get key →</a>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <input id="key-anthropic" type="password" placeholder="sk-ant-api03-..." style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none;" />
+              <span id="status-anthropic" style="font-family:'DM Mono',monospace;font-size:11px;padding:8px 10px;color:var(--text3);">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Free APIs -->
+        <div>
+          <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--accent2);letter-spacing:1px;margin-bottom:12px;">● FREE APIs — Market Data (all have free tiers)</div>
+
+          <!-- Finnhub -->
+          <div style="margin-bottom:14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <div>
+                <span style="font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:var(--text)">Finnhub</span>
+                <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);margin-left:8px;">Analyst ratings, insider sentiment, earnings · 60/min free</span>
+              </div>
+              <a href="https://finnhub.io/register" target="_blank" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--accent2);text-decoration:none;">Get key →</a>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <input id="key-finnhub" type="password" placeholder="your-finnhub-key" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none;" />
+              <span id="status-finnhub" style="font-family:'DM Mono',monospace;font-size:11px;padding:8px 10px;color:var(--text3);">—</span>
+            </div>
+          </div>
+
+          <!-- Alpha Vantage -->
+          <div style="margin-bottom:14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <div>
+                <span style="font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:var(--text)">Alpha Vantage</span>
+                <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);margin-left:8px;">Technicals, financials, AI news sentiment · 25/day free</span>
+              </div>
+              <a href="https://www.alphavantage.co/support/#api-key" target="_blank" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--accent2);text-decoration:none;">Get key →</a>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <input id="key-alphavantage" type="password" placeholder="your-alphavantage-key" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none;" />
+              <span id="status-alphavantage" style="font-family:'DM Mono',monospace;font-size:11px;padding:8px 10px;color:var(--text3);">—</span>
+            </div>
+          </div>
+
+          <!-- Mboum -->
+          <div style="margin-bottom:14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <div>
+                <span style="font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:var(--text)">Mboum Finance</span>
+                <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);margin-left:8px;">Congress trades, options flow, IV rank · 600/mo free</span>
+              </div>
+              <a href="https://rapidapi.com/sparkhub-sparkhub-default/api/mboum-finance" target="_blank" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--accent2);text-decoration:none;">Get key →</a>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <input id="key-mboum" type="password" placeholder="your-rapidapi-key" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none;" />
+              <span id="status-mboum" style="font-family:'DM Mono',monospace;font-size:11px;padding:8px 10px;color:var(--text3);">—</span>
+            </div>
+          </div>
+
+          <!-- Seeking Alpha -->
+          <div style="margin-bottom:14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <div>
+                <span style="font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:var(--text)">Seeking Alpha (RapidAPI)</span>
+                <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);margin-left:8px;">Quant ratings, factor grades · 1K/mo free</span>
+              </div>
+              <a href="https://rapidapi.com/apidojo/api/seeking-alpha" target="_blank" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--accent2);text-decoration:none;">Get key →</a>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <input id="key-seekingalpha" type="password" placeholder="your-rapidapi-key" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none;" />
+              <span id="status-seekingalpha" style="font-family:'DM Mono',monospace;font-size:11px;padding:8px 10px;color:var(--text3);">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: No Key Required -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;">
+          <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:1px;margin-bottom:10px;">● NO KEY REQUIRED — Auto-enabled</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            <span style="padding:4px 10px;background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.2);border-radius:4px;font-family:'DM Mono',monospace;font-size:10px;color:var(--accent);">✓ yfinance</span>
+            <span style="padding:4px 10px;background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.2);border-radius:4px;font-family:'DM Mono',monospace;font-size:10px;color:var(--accent);">✓ SEC EDGAR</span>
+            <span style="padding:4px 10px;background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.2);border-radius:4px;font-family:'DM Mono',monospace;font-size:10px;color:var(--accent);">✓ ApeWisdom</span>
+            <span style="padding:4px 10px;background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.2);border-radius:4px;font-family:'DM Mono',monospace;font-size:10px;color:var(--accent);">✓ StockTwits</span>
+            <span style="padding:4px 10px;background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.2);border-radius:4px;font-family:'DM Mono',monospace;font-size:10px;color:var(--accent);">✓ RSS Feeds</span>
+          </div>
+        </div>
+
+        <!-- SEC EDGAR email -->
+        <div>
+          <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:1px;margin-bottom:10px;">● SEC EDGAR — Email for User-Agent header (required by SEC)</div>
+          <input id="key-sec-email" type="email" placeholder="your-email@example.com" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none;" />
+        </div>
+
+        <!-- Save button -->
+        <div style="display:flex;justify-content:space-between;align-items:center;padding-top:4px;border-top:1px solid var(--border);">
+          <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);">Keys saved to browser localStorage — never sent anywhere except their own API</span>
+          <button onclick="saveAllKeys()" style="padding:10px 24px;background:var(--accent);border:none;border-radius:8px;color:#08090d;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;cursor:pointer;">Save All Keys</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- TICKER TAPE -->
+  <div id="tape-wrap">
+    <div id="tape"></div>
+  </div>
+
+  <!-- SETUP BANNER (shown until key is saved) -->
+  <div id="setup-banner" style="background:rgba(0,150,255,0.07);border-bottom:1px solid rgba(0,150,255,0.2);padding:8px 24px;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text2);flex-shrink:0;">
+    <span style="color:var(--accent2);font-size:14px;">ℹ</span>
+    <span>Click <strong style="color:var(--text)">⚙ API Keys</strong> in the top-right to set up your API keys. The Anthropic key is required to run analysis. Finnhub, Alpha Vantage, Mboum and Seeking Alpha are free and unlock full market data.</span>
+    <button onclick="document.getElementById('setup-banner').style.display='none'" style="margin-left:auto;background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;line-height:1;">✕</button>
+  </div>
+
+  <!-- BODY -->
+  <div id="body">
+
+    <!-- SIDEBAR -->
+    <div id="sidebar">
+      <div class="sidebar-label">ANALYSIS MODES</div>
+      <button class="mode-btn active" data-mode="deepdive">
+        <span class="icon">◎</span>
+        <div><div class="label">Deep Dive</div><div class="sub">1–10 tickers</div></div>
+      </button>
+      <button class="mode-btn" data-mode="scanner">
+        <span class="icon">⊕</span>
+        <div><div class="label">Opportunity Scanner</div><div class="sub">Daily ideas</div></div>
+      </button>
+      <button class="mode-btn" data-mode="portfolio">
+        <span class="icon">⊞</span>
+        <div><div class="label">Portfolio Review</div><div class="sub">Holdings review</div></div>
+      </button>
+      <div class="sidebar-label" id="history-label" style="margin-top:16px;display:none;">RECENT</div>
+      <div id="history-list"></div>
+    </div>
+
+    <!-- MAIN -->
+    <div id="main">
+
+      <!-- Mode header card -->
+      <div class="card">
+        <div id="mode-header">
+          <div id="mode-icon">◎</div>
+          <div>
+            <div id="mode-title">Stock Deep Dive</div>
+            <div id="mode-desc">Full analyst-grade report: fundamentals, technicals, sentiment, entry/exit levels &amp; rating</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input card -->
+      <div class="card">
+        <div id="focus-pills-wrap" style="display:none;margin-bottom:10px;"></div>
+        <div class="input-row">
+          <input id="ticker-input" type="text" placeholder="Enter ticker(s) e.g. AAPL, NVDA, MSFT" />
+          <button id="run-btn">Run Analysis →</button>
+        </div>
+        <div class="quick-pills" id="quick-pills-wrap">
+          <span class="quick-label">Quick:</span>
+        </div>
+      </div>
+
+      <!-- Output -->
+      <div id="output-wrap" class="fade-in" style="display:none;">
+        <div id="output-header">
+          <div id="output-status">
+            <span id="status-text">✓ ANALYSIS COMPLETE</span>
+            <span id="example-badge" style="display:none;">EXAMPLE · NVDA</span>
+          </div>
+          <button id="copy-btn">Copy Report</button>
+        </div>
+        <div id="output-box"></div>
+      </div>
+
+      <!-- Empty state -->
+      <div id="empty">
+        <div id="empty-icon">◎</div>
+        <div id="empty-title">Ready to analyze</div>
+        <div id="empty-desc">Enter one or more tickers above for a comprehensive institutional-grade report.</div>
+        <div class="feature-pills" id="feature-pills"></div>
+      </div>
+
+    </div><!-- /main -->
+
+    <!-- RIGHT PANEL -->
+    <div id="right">
+
+      <!-- NVDA card (example) -->
+      <div class="nvda-card" id="nvda-card">
+        <div class="nvda-top">
+          <span class="nvda-ticker">NVDA</span>
+          <span class="badge badge-buy">STRONG BUY</span>
+        </div>
+        <div class="nvda-price">$183.22</div>
+        <div class="nvda-chg">+1.65% · Mar 16, 2026</div>
+        <div class="panel-label">COMPOSITE SCORE</div>
+        <div class="score-ring"><span>82</span></div>
+        <div class="score-row"><span style="color:var(--text2)">Fundamental (40%)</span><span style="color:var(--accent)">85/100</span></div>
+        <div class="score-track"><div class="score-fill" style="width:85%;background:var(--accent)"></div></div>
+        <div class="score-row"><span style="color:var(--text2)">Technical (30%)</span><span style="color:var(--accent2)">72/100</span></div>
+        <div class="score-track"><div class="score-fill" style="width:72%;background:var(--accent2)"></div></div>
+        <div class="score-row"><span style="color:var(--text2)">Sentiment (30%)</span><span style="color:var(--accent3)">88/100</span></div>
+        <div class="score-track"><div class="score-fill" style="width:88%;background:var(--accent3)"></div></div>
+      </div>
+
+      <!-- Key stats (example) -->
+      <div class="panel-card" id="stats-card">
+        <div class="panel-label">KEY STATS</div>
+        <div class="stat-row"><span class="stat-label">Market Cap</span><span class="stat-val">$4.5T</span></div>
+        <div class="stat-row"><span class="stat-label">P/E Ratio</span><span class="stat-val">36.8x</span></div>
+        <div class="stat-row"><span class="stat-label">Rev Growth</span><span class="stat-val">+65.5%</span></div>
+        <div class="stat-row"><span class="stat-label">52W Range</span><span class="stat-val">$86–$212</span></div>
+        <div class="stat-row"><span class="stat-label">Analyst PT</span><span class="stat-val">$273.61</span></div>
+        <div class="stat-row" style="border:none;margin:0;padding:0;"><span class="stat-label">R:R Ratio</span><span class="stat-val">3.5:1</span></div>
+      </div>
+
+      <!-- Score guide (shown after real analysis) -->
+      <div class="panel-card" id="score-guide" style="display:none;">
+        <div class="panel-label">SCORE GUIDE</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3)">75–100</span>
+          <span class="badge badge-buy" style="font-size:10px;padding:2px 8px;">BUY</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3)">40–74</span>
+          <span class="badge badge-hold" style="font-size:10px;padding:2px 8px;">HOLD</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3)">0–39</span>
+          <span class="badge badge-sell" style="font-size:10px;padding:2px 8px;">SELL</span>
+        </div>
+      </div>
+
+      <!-- Weights (shown after real analysis) -->
+      <div class="panel-card" id="weights-card" style="display:none;">
+        <div class="panel-label">SCORE WEIGHTS</div>
+        <div style="margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+            <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3)">Fundamental</span>
+            <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--accent)">40%</span>
+          </div>
+          <div class="score-track"><div class="score-fill" style="width:40%;background:var(--accent)"></div></div>
+        </div>
+        <div style="margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+            <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3)">Technical</span>
+            <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--accent2)">30%</span>
+          </div>
+          <div class="score-track"><div class="score-fill" style="width:30%;background:var(--accent2)"></div></div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+            <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3)">Sentiment</span>
+            <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--accent3)">30%</span>
+          </div>
+          <div class="score-track"><div class="score-fill" style="width:30%;background:var(--accent3)"></div></div>
+        </div>
+      </div>
+
+      <div class="disclaimer">⚠ AI-generated research only. Not financial advice. Always do your own due diligence.</div>
+      <div class="powered-by">Powered by Claude AI + Financial Analysis Skill v1.0</div>
+    </div><!-- /right -->
+
+  </div><!-- /body -->
+</div><!-- /app -->
+
+<script>
+// ─── CONFIG ───────────────────────────────────────────────────────────────────
+const TAPE_ITEMS = ["AAPL +1.2%","NVDA +1.7%","MSFT -0.3%","TSLA +2.1%","AMZN +0.8%",
+  "META +1.7%","GOOGL -0.5%","BRK.B +0.4%","JPM +1.1%","V +0.6%",
+  "SPY +0.9%","QQQ +1.3%","BTC +2.8%","GOLD -0.2%","OIL +1.5%"];
+
+const MODES = {
+  deepdive: {
+    icon: "◎", title: "Stock Deep Dive",
+    desc: "Full analyst-grade report: fundamentals, technicals, sentiment, entry/exit levels & rating",
+    placeholder: "Enter ticker(s) e.g. AAPL, NVDA, MSFT",
+    features: ["Fundamental Score","Technical Score","Sentiment Score","Entry Levels","Price Targets","Risk Assessment"],
+    emptyDesc: "Enter one or more tickers above for a comprehensive institutional-grade report."
+  },
+  scanner: {
+    icon: "⊕", title: "Opportunity Scanner",
+    desc: "AI scans for the best Portfolio Adds + Swing Trades in current market conditions",
+    placeholder: "e.g. growth stocks, beaten-down value, dividend income...",
+    features: ["Market Scanning","Portfolio Adds","Swing Trades","R:R Analysis","Sector Rotation","Momentum Signals"],
+    emptyDesc: "Select a focus area and hit Run to discover today's best opportunities.",
+    focusPills: ["Growth","Value","Dividend","Momentum","Small Cap","Tech","Healthcare","Energy"]
+  },
+  portfolio: {
+    icon: "⊞", title: "Portfolio Review",
+    desc: "Get Hold/Trim/Sell verdicts + updated entry/exit targets for your holdings",
+    placeholder: "e.g. AAPL 50 shares, MSFT 30 shares, NVDA 20 shares...",
+    features: ["Hold/Trim/Sell","Re-entry Levels","Target Updates","Risk Monitoring","Diversification","Hedging Ideas"],
+    emptyDesc: "Paste your holdings and get actionable hold/trim/sell recommendations."
+  }
+};
+
+const QUICK_TICKERS = ["AAPL","NVDA","MSFT","TSLA","AMZN","META","GOOGL","JPM","SPY","BRK.B"];
+
+const NVDA_REPORT = `## NVDA — NVIDIA Corporation | STRONG BUY | Score: 82/100
+
+Current Price: $183.22 (March 16, 2026)  ·  Market Cap: $4.5T  ·  Exchange: NASDAQ
+
+## Fundamental Analysis (Score: 85/100)
+
+NVIDIA's FY2026 revenue reached $215.94 billion — up 65.5% year-over-year — with earnings of $120.07 billion, a 64.75% increase. Data center revenue alone hit $51.2 billion in the most recent quarter, up 66% YoY, reflecting extraordinary demand for AI infrastructure. Gross margins remain elite, underpinned by the CUDA software moat and near-monopoly pricing power in AI accelerators.
+
+- P/E: 36.8x — compressed relative to growth rate, implying PEG well below 1.0
+- EV/EBITDA: ~30x — premium but justified by 65%+ revenue CAGR
+- FCF Generation: Robust; supports ongoing R&D and shareholder returns
+- ROC: Declined from ~111% to ~94% — worth monitoring as capital base scales
+- FY2026 EPS est.: $4.42/share (+50.9% YoY)
+
+## Technical Analysis (Score: 72/100)
+
+NVDA is consolidating within a wide horizontal range following its run from the $86 52-week low to the $212 high. Short-term MAs are slightly below long-term MAs — a mild bearish cross — but a pivot bottom buy signal was issued Feb 27 and price has held.
+
+- 52-Week Range: $86.62 – $212.19 (currently near midpoint — not overbought)
+- 90-day probability range: $173.51 – $197.07
+- Resistance: $182.57 / $185.42 (break above = fresh buy signal)
+- Support: $175 / $168 / $160
+- RSI: ~52 — neutral, room to run
+- MACD: Mild sell signal on 3-month, but short-term momentum recovering post-GTC
+
+## Sentiment & Positioning (Score: 88/100)
+
+- Analyst Consensus: STRONG BUY — 38 Buy, 1 Hold, 0 Sell (out of 39 analysts)
+- Average 12-month Price Target: $273.61 (+49% upside from $183)
+- Target Range: $100 (bear) to $360 (bull)
+- Recent Upgrades: Wedbush $300, Citi $300, Tigress Financial $360
+- GTC 2026 Catalyst: Wedbush's Dan Ives called NVIDIA "alone at the top of the AI mountain"
+- Institutional: ByteDance confirmed $2.5B Nvidia buildout outside China
+- Jensen Huang projecting $1 trillion in revenue through 2027
+
+## Entry & Exit Strategy
+
+- Entry 1 (Aggressive):   $183  — Current price, GTC momentum catalyst
+- Entry 2 (Moderate):     $175  — Near support / Fib 38.2% retracement
+- Entry 3 (Conservative): $165  — Strong support / prior base
+- Target 1 (T1):          $212  — Prior 52-week high resistance (+16%)
+- Target 2 (T2):          $263  — Analyst consensus target (+44%)
+- Target 3 (T3):          $300  — Wedbush / Citi bull case (+64%)
+- Stop Loss:              $168  — Below key support (-8%)
+- Risk : Reward:          3.5:1 — Based on T2 vs. Stop (exceeds 2:1 minimum)
+
+## Key Catalysts (Bull Case)
+
+- GTC 2026: Vera CPU + Omniverse NuRec signal platform expansion beyond chips
+- Jensen Huang targets $1T revenue through 2027 — data center supercycle intact
+- Sovereign AI: Global government AI initiatives create demand buffer vs. China headwinds
+- ByteDance $2.5B buildout adds near-term revenue visibility
+- Roche "AI factory" + enterprise adoption wave accelerating
+
+## Key Risks (Bear Case)
+
+- Hyperscaler capex plateau risk — Amazon/Google spending pressures flagged by analysts
+- US export controls on China — previously 20-25% of data center revenue
+- New GPU competition: AMD, domestic Chinese GPU entrants, custom silicon (Google TPU, AWS Trainium)
+- Gaming revenue underperformance vs. expectations
+- ROC compression as capital base scales with Blackwell/Rubin buildout
+
+## Final Verdict
+
+STRONG BUY — Composite Score: 82/100 — Confidence: STRONG
+
+NVDA is the clearest AI infrastructure compounder in public markets. The technical setup is consolidating, not broken. Fundamentals are exceptional. Analyst sentiment just received a fresh boost from GTC 2026. At $183 with a consensus target of $263+, the risk/reward exceeds the 2:1 minimum threshold at 3.5:1.
+
+For clients: "NVIDIA makes the engines that power all of AI — every major tech company is paying them, and that is not changing anytime soon."`;
+
+// ─── API KEY MANAGEMENT ───────────────────────────────────────────────────────
+const KEY_IDS = ["anthropic","finnhub","alphavantage","mboum","seekingalpha","sec-email"];
+const KEY_LABELS = { anthropic:"Anthropic", finnhub:"Finnhub", alphavantage:"Alpha Vantage", mboum:"Mboum", seekingalpha:"Seeking Alpha" };
+
+function openKeyModal() {
+  // Load saved values into inputs
+  KEY_IDS.forEach(id => {
+    const el = document.getElementById("key-" + id);
+    if (el) el.value = localStorage.getItem("fa_key_" + id) || "";
+  });
+  updateKeyStatuses();
+  const modal = document.getElementById("key-modal");
+  modal.style.display = "flex";
+}
+
+function closeKeyModal() {
+  document.getElementById("key-modal").style.display = "none";
+}
+
+// Close modal on backdrop click
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("key-modal").addEventListener("click", (e) => {
+    if (e.target === document.getElementById("key-modal")) closeKeyModal();
+  });
+});
+
+function saveAllKeys() {
+  KEY_IDS.forEach(id => {
+    const el = document.getElementById("key-" + id);
+    if (el && el.value.trim()) {
+      localStorage.setItem("fa_key_" + id, el.value.trim());
+    }
+  });
+  updateKeyStatuses();
+  updateHeaderStatus();
+
+  // Flash confirmation
+  const btn = document.querySelector("#key-modal button[onclick='saveAllKeys()']");
+  if (btn) {
+    const orig = btn.textContent;
+    btn.textContent = "✓ Saved!";
+    btn.style.background = "#00b87a";
+    setTimeout(() => { btn.textContent = orig; btn.style.background = ""; }, 2000);
+  }
+  setTimeout(closeKeyModal, 1200);
+}
+
+function updateKeyStatuses() {
+  ["anthropic","finnhub","alphavantage","mboum","seekingalpha"].forEach(id => {
+    const el = document.getElementById("status-" + id);
+    if (!el) return;
+    const val = localStorage.getItem("fa_key_" + id) || document.getElementById("key-" + id)?.value || "";
+    if (val.length > 6) {
+      el.textContent = "✓ Set";
+      el.style.color = "var(--accent)";
+    } else {
+      el.textContent = "— Not set";
+      el.style.color = "var(--text3)";
+    }
+  });
+}
+
+function updateHeaderStatus() {
+  const hasAnthropic = localStorage.getItem("fa_key_anthropic");
+  const pill = document.getElementById("key-status-pill");
+  if (hasAnthropic) {
+    const count = ["finnhub","alphavantage","mboum","seekingalpha"].filter(k => localStorage.getItem("fa_key_" + k)).length;
+    pill.textContent = `✓ ${count + 1}/5 Keys Set`;
+    pill.style.background = "rgba(0,229,160,0.1)";
+    pill.style.borderColor = "rgba(0,229,160,0.3)";
+    pill.style.color = "var(--accent)";
+  } else {
+    pill.textContent = "⚠ API Keys Not Set";
+    pill.style.background = "rgba(255,68,102,0.1)";
+    pill.style.borderColor = "rgba(255,68,102,0.3)";
+    pill.style.color = "var(--sell)";
+  }
+}
+
+function getApiKey() {
+  return localStorage.getItem("fa_key_anthropic") || "";
+}
+
+function saveApiKey() {} // legacy stub — no-op
+let currentMode   = "deepdive";
+let selectedFocus = "";
+let isLoading     = false;
+let isExample     = true;
+let history       = [];
+let currentOutput = NVDA_REPORT;
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+function init() {
+  // Date
+  document.getElementById("header-date").textContent =
+    new Date().toLocaleDateString("en-US", { weekday:"short", month:"short", day:"numeric", year:"numeric" });
+
+  // Load saved API key if exists
+  const savedKey = localStorage.getItem("fa_key_anthropic");
+  if (savedKey) {
+    document.getElementById("setup-banner").style.display = "none";
+  }
+  updateHeaderStatus();
+
+  // Ticker tape
+  const tape = document.getElementById("tape");
+  const items = [...TAPE_ITEMS, ...TAPE_ITEMS];
+  tape.innerHTML = items.map(t =>
+    `<span style="color:${t.includes("+") ? "var(--accent)" : "var(--sell)"}">${t}</span>`
+  ).join("");
+
+  // Quick tickers
+  const qw = document.getElementById("quick-pills-wrap");
+  QUICK_TICKERS.forEach(t => {
+    const btn = document.createElement("button");
+    btn.className = "quick-pill";
+    btn.textContent = t;
+    btn.onclick = () => {
+      const inp = document.getElementById("ticker-input");
+      inp.value = inp.value ? inp.value + ", " + t : t;
+    };
+    qw.appendChild(btn);
+  });
+
+  // Sidebar mode buttons
+  document.querySelectorAll(".mode-btn").forEach(btn => {
+    btn.addEventListener("click", () => switchMode(btn.dataset.mode));
+  });
+
+  // Run button
+  document.getElementById("run-btn").addEventListener("click", runAnalysis);
+  document.getElementById("ticker-input").addEventListener("keydown", e => {
+    if (e.key === "Enter") runAnalysis();
+  });
+
+  // Copy button
+  document.getElementById("copy-btn").addEventListener("click", () => {
+    navigator.clipboard.writeText(currentOutput).catch(() => {});
+  });
+
+  // Show NVDA example
+  showOutput(NVDA_REPORT, false, true);
+}
+
+// ─── MODE SWITCH ──────────────────────────────────────────────────────────────
+function switchMode(mode) {
+  currentMode = mode;
+  selectedFocus = "";
+
+  document.querySelectorAll(".mode-btn").forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
+
+  const m = MODES[mode];
+  document.getElementById("mode-icon").textContent  = m.icon;
+  document.getElementById("mode-title").textContent = m.title;
+  document.getElementById("mode-desc").textContent  = m.desc;
+  document.getElementById("ticker-input").placeholder = m.placeholder;
+
+  // Empty state
+  document.getElementById("empty-icon").textContent  = m.icon;
+  document.getElementById("empty-desc").textContent  = m.emptyDesc;
+
+  // Feature pills
+  const fp = document.getElementById("feature-pills");
+  fp.innerHTML = m.features.map(f => `<span class="feature-pill">${f}</span>`).join("");
+
+  // Focus pills (scanner only)
+  const fpw = document.getElementById("focus-pills-wrap");
+  const qpw = document.getElementById("quick-pills-wrap");
+  if (mode === "scanner" && m.focusPills) {
+    fpw.style.display = "flex";
+    fpw.style.flexWrap = "wrap";
+    fpw.style.gap = "8px";
+    fpw.innerHTML = m.focusPills.map(f =>
+      `<button class="focus-pill" onclick="selectFocus('${f}',this)">${f}</button>`
+    ).join("");
+    qpw.style.display = "none";
+  } else {
+    fpw.style.display = "none";
+    qpw.style.display = mode === "deepdive" ? "flex" : "none";
+  }
+
+  // Clear output
+  hideOutput();
+}
+
+function selectFocus(f, el) {
+  selectedFocus = selectedFocus === f ? "" : f;
+  document.querySelectorAll(".focus-pill").forEach(p => p.classList.remove("active"));
+  if (selectedFocus) el.classList.add("active");
+}
+
+// ─── OUTPUT ───────────────────────────────────────────────────────────────────
+function showOutput(text, loading, example) {
+  isExample = !!example;
+  currentOutput = text || "";
+
+  const wrap  = document.getElementById("output-wrap");
+  const box   = document.getElementById("output-box");
+  const empty = document.getElementById("empty");
+  const badge = document.getElementById("example-badge");
+  const status = document.getElementById("status-text");
+  const copyBtn = document.getElementById("copy-btn");
+  const runBtn  = document.getElementById("run-btn");
+
+  wrap.style.display  = "block";
+  empty.style.display = "none";
+
+  badge.style.display  = example ? "inline" : "none";
+  copyBtn.style.display = loading ? "none" : "inline";
+
+  if (loading) {
+    status.innerHTML = `<span id="spinner"></span> GENERATING ANALYSIS...`;
+  } else {
+    status.textContent = "✓ ANALYSIS COMPLETE";
+  }
+
+  runBtn.disabled = !!loading;
+  runBtn.innerHTML = loading
+    ? `<span id="spinner"></span> Analyzing...`
+    : "Run Analysis →";
+
+  box.className = loading ? "stream-cursor" : "";
+  box.innerHTML = renderReport(text);
+  box.scrollTop = box.scrollHeight;
+}
+
+function hideOutput() {
+  document.getElementById("output-wrap").style.display = "none";
+  document.getElementById("empty").style.display = "flex";
+}
+
+function appendOutput(text) {
+  currentOutput = text;
+  const box = document.getElementById("output-box");
+  box.innerHTML = renderReport(text);
+  box.scrollTop = box.scrollHeight;
+}
+
+// ─── REPORT RENDERER ─────────────────────────────────────────────────────────
+function renderReport(text) {
+  if (!text) return "";
+  return text.split("\n").map(line => {
+    if (line.startsWith("## "))  return `<div class="r-h2">${esc(line.slice(3))}</div>`;
+    if (line.startsWith("### ")) return `<div class="r-h3">${esc(line.slice(4))}</div>`;
+    if (line.startsWith("- ") || line.startsWith("• "))
+      return `<div class="r-li">${esc(line.replace(/^[-•] /,""))}</div>`;
+    if (/STRONG BUY|BUY/.test(line) && !/RISK|BEAR|NOT/.test(line))
+      return `<div class="r-buy">${esc(line)}</div>`;
+    if (/SELL|STRONG SELL/.test(line))
+      return `<div class="r-sell">${esc(line)}</div>`;
+    if (/\bHOLD\b|\bWATCH\b/.test(line))
+      return `<div class="r-hold">${esc(line)}</div>`;
+    if (line.startsWith("|"))
+      return `<span class="r-tbl">${esc(line)}</span>`;
+    if (line.trim() === "") return `<span class="r-blank"></span>`;
+    return `<div class="r-text">${esc(line)}</div>`;
+  }).join("");
+}
+
+function esc(s) {
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+// ─── ANALYSIS ────────────────────────────────────────────────────────────────
+function buildSystemPrompt(mode) {
+  const base = `You are an elite institutional equity analyst with expertise in fundamental, technical, and quantitative analysis. You produce concise, data-driven reports using real-world financial knowledge up to your training cutoff. Format output with ## for section headers, ### for sub-headers, and bullet points with -. Use verified, realistic data — never fabricate specific numbers you are unsure of.`;
+  if (mode === "deepdive") return base + `
+
+DEEP DIVE REPORT FORMAT — for each ticker:
+
+## [TICKER] — [Company Name] | [RATING] | Score: [X]/100
+
+Current Price and market context.
+
+## Fundamental Analysis (Score: X/100)
+Key metrics, ratios, growth rates, balance sheet.
+
+## Technical Analysis (Score: X/100)
+MAs, RSI, MACD, support/resistance levels.
+
+## Sentiment & Positioning (Score: X/100)
+Analyst consensus, insider activity, short interest.
+
+## Entry & Exit Strategy
+- Entry 1 (Aggressive): $XX
+- Entry 2 (Moderate): $XX
+- Entry 3 (Conservative): $XX
+- Target 1 (T1): $XX (+X%)
+- Target 2 (T2): $XX (+X%)
+- Target 3 (T3): $XX (+X%)
+- Stop Loss: $XX (-X%)
+- Risk : Reward: X:1
+
+## Key Catalysts (Bull Case)
+## Key Risks (Bear Case)
+## Final Verdict
+Confidence: STRONG / MODERATE / WEAK`;
+
+  if (mode === "scanner") return base + `
+OPPORTUNITY SCANNER FORMAT:
+## Market Conditions Overview
+## Top 5 Portfolio Adds (Medium-Long Term)
+For each: ### [RANK]. [TICKER] — [Name] | [RATING] | Score: X/100 with entry/target/stop/R:R
+## Top 5 Swing Trades (1-4 Week Horizon)
+For each: ### [RANK]. [TICKER] — Setup, entry/target/stop/R:R/horizon
+## Sectors to Watch
+## Sectors to Avoid`;
+
+  return base + `
+PORTFOLIO REVIEW FORMAT:
+## Portfolio Health Summary
+## Holdings Analysis
+For each ticker: ### [TICKER] — [Rating] | Score: X/100 with Action (BUY MORE/HOLD/TRIM/SELL), entries, targets, stop, key risk
+## Portfolio Optimization Suggestions`;
+}
+
+async function runAnalysis() {
+  const input = document.getElementById("ticker-input").value.trim();
+  if (!input || isLoading) return;
+
+  const apiKey = getApiKey();
+  if (!apiKey || !apiKey.startsWith("sk-ant-")) {
+    showOutput("⚠ Anthropic API key not found.\n\nClick the ⚙ API Keys button in the top-right corner to set up your keys.\n\nYou need:\n- Anthropic key (required) → console.anthropic.com\n- Finnhub (free) → finnhub.io/register\n- Alpha Vantage (free) → alphavantage.co\n- Mboum (free) → rapidapi.com\n- Seeking Alpha (free) → rapidapi.com", false, false);
+    return;
+  }
+
+  isLoading = true;
+
+  // Switch right panel to score guide
+  document.getElementById("nvda-card").style.display   = "none";
+  document.getElementById("stats-card").style.display  = "none";
+  document.getElementById("score-guide").style.display = "block";
+  document.getElementById("weights-card").style.display = "block";
+
+  const userMsg = currentMode === "deepdive"
+    ? `Run a full deep dive analysis on: ${input.toUpperCase()}`
+    : currentMode === "scanner"
+    ? `Scan the market and find the best opportunities for: ${input || "general growth portfolio"}. Focus: ${selectedFocus || "balanced"}`
+    : `Review this portfolio and give buy/hold/trim/sell recommendations: ${input}`;
+
+  showOutput("", true, false);
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-request-check": "I-am-testing-in-browser"
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1500,
+        stream: false,
+        system: buildSystemPrompt(currentMode),
+        messages: [{ role: "user", content: userMsg }]
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    const full = data?.content?.[0]?.text || "No response received.";
+
+    // Save history
+    const entry = { mode: currentMode, input: input.slice(0,35), output: full, ts: new Date().toLocaleTimeString() };
+    history.unshift(entry);
+    if (history.length > 6) history.pop();
+    renderHistory();
+
+    showOutput(full, false, false);
+
+  } catch (err) {
+    showOutput(`Error: ${err.message}\n\nIf this says "Failed to fetch", try opening the file via a local server or GitHub Pages instead of double-clicking the file directly.`, false, false);
+  } finally {
+    isLoading = false;
+    document.getElementById("run-btn").disabled = false;
+    document.getElementById("run-btn").textContent = "Run Analysis →";
+    document.getElementById("output-box").classList.remove("stream-cursor");
+  }
+}
+
+function renderHistory() {
+  const label = document.getElementById("history-label");
+  const list  = document.getElementById("history-list");
+  if (history.length === 0) { label.style.display = "none"; return; }
+  label.style.display = "block";
+  const icons = { deepdive:"◎", scanner:"⊕", portfolio:"⊞" };
+  list.innerHTML = history.map((h,i) => `
+    <button class="history-item" onclick="loadHistory(${i})">
+      <span style="color:var(--text3);font-size:10px">${icons[h.mode]||"◎"}</span>
+      <div>
+        <div class="hticker">${h.input}</div>
+        <div class="htime">${h.ts}</div>
+      </div>
+    </button>`).join("");
+}
+
+function loadHistory(i) {
+  const h = history[i];
+  if (!h) return;
+  currentOutput = h.output;
+  showOutput(h.output, false, false);
+}
+
+// ─── START ────────────────────────────────────────────────────────────────────
+window.selectFocus  = selectFocus;
+window.loadHistory  = loadHistory;
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>
