@@ -14,10 +14,32 @@ module.exports = function handler(req, res) {
     return;
   }
 
+  // Collect raw body chunks
   let rawBody = "";
   req.on("data", chunk => { rawBody += chunk.toString(); });
   req.on("end", () => {
-    const bodyToSend = rawBody || "{}";
+
+    // Validate body
+    if (!rawBody || rawBody.trim() === "") {
+      res.status(400).json({ error: { message: "Empty request body" } });
+      return;
+    }
+
+    // Parse and re-stringify to ensure valid JSON with required fields
+    let parsed;
+    try {
+      parsed = JSON.parse(rawBody);
+    } catch (e) {
+      res.status(400).json({ error: { message: "Invalid JSON: " + e.message } });
+      return;
+    }
+
+    // Ensure required Anthropic fields are present
+    if (!parsed.model) parsed.model = "claude-sonnet-4-6";
+    if (!parsed.max_tokens) parsed.max_tokens = 1500;
+
+    const bodyToSend = JSON.stringify(parsed);
+
     const options = {
       hostname: "api.anthropic.com",
       port: 443,
@@ -38,7 +60,7 @@ module.exports = function handler(req, res) {
         try {
           res.status(httpRes.statusCode).json(JSON.parse(raw));
         } catch(e) {
-          res.status(500).json({ error: { message: "Parse error: " + raw } });
+          res.status(500).json({ error: { message: "Parse error: " + raw.slice(0, 200) } });
         }
       });
     });
